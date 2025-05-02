@@ -1,0 +1,78 @@
+💡 Here's how you can enhance your project:
+✅ 1. Line Charts for Price / Volume (Already Started)
+
+Use Chart.js or Plotly in the frontend to show:
+
+    Price trends over time (Close price)
+
+    Volume trends (detect unusual spikes)
+
+✅ 2. Peer Comparison
+
+Create a comparison dashboard:
+
+    User selects 2–5 stocks
+
+    Show side-by-side graphs / tables of:
+
+        PE Ratio, ROCE, ROE, Debt-to-Equity, etc.
+
+        1Y Return, 5Y Return (you can get this from yfinance or nsetools)
+
+✅ 3. Profit & Loss and Cash Flow Statements
+
+Use:
+
+    yfinance.Ticker().financials for profit/loss
+
+    ticker.cashflow for cash flow
+
+    Display these as tables or bar charts (income, expenses, etc.)
+
+✅ 4. Z-Score for Volume/Price Spike Detection
+
+Detect anomalies in:
+
+    Volume (unusual activity)
+
+    Price (gap-ups, gap-downs)
+
+✅ 5. Stock Alerts / Email Notifications
+
+Let users set a price target or spike alert and receive email alerts.
+
+
+✅ Proposed Feature Roadmap:
+📈 1. Interactive Line Charts
+
+    Price trend (Close, Volume) using Chart.js or Plotly.
+
+    Multi-stock comparison charts.
+
+📊 2. Financial Data Display (like Screener.in)
+
+    Display:
+
+        Revenue, Net Profit, EPS, P/E, ROE, ROCE
+
+        Balance Sheet, Cash Flow, Ratios (Yearly)
+
+    Use APIs like Yahoo Finance (yfinance) or investpy.
+
+👥 3. Peer Comparison
+
+    Compare a stock with others from the same sector or Nifty index.
+
+    Metrics: Market Cap, P/E, Profit, Return %, Volume.
+
+⚠️ 4. Volume Spike & Anomaly Detection
+
+    Highlight unusual trading using Z-score on volume.
+
+    Option to export signals to CSV.
+
+🧠 5. Add Alerts / Watchlist Flags (Future Scope)
+
+    Allow saving stocks to "Watchlist".
+
+    Set threshold alert logic.

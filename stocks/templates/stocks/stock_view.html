@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Watchlist</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f6fa;
+            margin: 40px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2f3640;
+        }
+        form {
+            max-width: 600px;
+            margin: 0 auto 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        label, select, button {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        select {
+            padding: 8px;
+        }
+        button {
+            background-color: #40739e;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #273c75;
+        }
+        table {
+            width: 90%;
+            margin: 0 auto 30px;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #dcdde1;
+            text-align: center;
+        }
+        th {
+            background-color: #f1f2f6;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Stock Watchlist</h1>
+    <form method="POST">
+        {% csrf_token %}
+        <label>Select Ticker:</label>
+        <select name="ticker" id="tickerDropdown">
+            {% for stock in tickers %}
+                <option value="{{ stock.ticker }}" {% if stock.ticker == selected_ticker %}selected{% endif %}>{{ stock.ticker }}</option>
+            {% endfor %}
+        </select>
+        <button name="fetch_data" type="submit" value="1">Get Data</button>
+        {% if data %}
+        <button type="submit" name="export_csv">Export as CSV</button>
+        {% endif %}
+    </form>
+
+    {% if data %}
+        <h2 style="text-align: center;">Recent Stock Data</h2>
+        <table>
+            <tr>
+                <th>Date</th>
+                <th>Close</th>
+                <th>Volume</th>
+            </tr>
+            {% for row in data %}
+                <tr>
+                    <td>{{ row.Date }}</td>
+                    <td>{{ row.Close }}</td>
+                    <td>{{ row.Volume }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+
+    <canvas id="stockChart" width="800" height="400"></canvas>
+
+    <script>
+        function handleTickerChange(selectElement) {
+            const dropdown = document.getElementById('tickerDropdown');
+            const ctx = document.getElementById('stockChart').getContext('2d');
+            let chart;
+
+            const ticker = dropdown.value;
+            if (!ticker) return;
+
+            fetch(`/get_stock_data/?ticker=${ticker}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (chart) chart.destroy();
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.dates,
+                            datasets: [{
+                                label: `${ticker} Closing Prices`,
+                                data: data.closing_prices,
+                                borderColor: 'blue',
+                                fill: false,
+                                tension: 0.3
+                            }]
+                        }
+                    });
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropdown = document.getElementById('tickerDropdown');
+            const formWasSubmitted = {{ form_submitted|yesno:"true,false" }};
+            if (formWasSubmitted && dropdown) {
+                handleTickerChange(dropdown);
+            }
+        });
+    </script>
+</body>
+</html>

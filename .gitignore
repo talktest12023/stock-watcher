@@ -1,0 +1,16 @@
+# Django
+*.pyc
+__pycache__/
+db.sqlite3
+.env
+venv/
+*.log
+
+# VSCode or PyCharm
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+

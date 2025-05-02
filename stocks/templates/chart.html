@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Watchlist</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h2>Stock Watchlist</h2>
+
+    <label>Select Stock:</label>
+    <select id="tickerDropdown">
+        <option value="">--Select--</option>
+        <option value="RELIANCE.NS">RELIANCE</option>
+        <option value="TCS.NS">TCS</option>
+        <!-- Add more tickers as needed -->
+    </select>
+
+    <canvas id="stockChart" width="800" height="400"></canvas>
+
+    <script>
+        const dropdown = document.getElementById('tickerDropdown');
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        let chart;
+
+        dropdown.addEventListener('change', () => {
+            const ticker = dropdown.value;
+            if (!ticker) return;
+
+            fetch(`../get_stock_data/?ticker=${ticker}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (chart) chart.destroy();  // remove old chart
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.dates,
+                            datasets: [{
+                                label: `${ticker} Closing Prices`,
+                                data: data.closing_prices,
+                                borderColor: 'blue',
+                                fill: false,
+                                tension: 0.3
+                            }]
+                        }
+                    });
+                });
+        });
+    </script>
+</body>
+</html>
