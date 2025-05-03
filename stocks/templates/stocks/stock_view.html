@@ -72,11 +72,11 @@
     <form method="POST">
         {% csrf_token %}
         <label>Select Ticker:</label>
-        <select name="ticker" id="tickerDropdown">
-            {% for stock in tickers %}
-                <option value="{{ stock.ticker }}" {% if stock.ticker == selected_ticker %}selected{% endif %}>{{ stock.ticker }}</option>
-            {% endfor %}
-        </select>
+        <select name="ticker[]" id="tickerDropdown" multiple size="5">
+    {% for stock in tickers %}
+        <option value="{{ stock.ticker }}" {% if stock.ticker in selected_ticker %}selected{% endif %}>{{ stock.ticker }}</option>
+    {% endfor %}
+</select>
         <button name="fetch_data" type="submit" value="1">Get Data</button>
         {% if data %}
         <button type="submit" name="export_csv">Export as CSV</button>
@@ -84,61 +84,178 @@
     </form>
 
     {% if data %}
-        <h2 style="text-align: center;">Recent Stock Data</h2>
+        <h2 style="text-align: center;">Recent Stock Data with Z-Score</h2>
         <table>
             <tr>
+                <th>Ticker</th>
                 <th>Date</th>
                 <th>Close</th>
                 <th>Volume</th>
+                <th>Z-Score On Close-Price</th>
+                <th>Z-Score On Volume</th>
             </tr>
             {% for row in data %}
-                <tr>
+                           <tr style="{% if row.Z_Score_Close >= 2 or  row.Z_Score_Close <= -2 %} background-color: #ffcccc; {% endif %}">
+                    <td>{{ row.Ticker }}</td>
                     <td>{{ row.Date }}</td>
                     <td>{{ row.Close }}</td>
                     <td>{{ row.Volume }}</td>
+                    <td>{{ row.Z_Score_Close|floatformat:3 }}</td>
+                    <td>{{ row.Z_Score_Volume}}</td>
+                    
                 </tr>
             {% endfor %}
         </table>
     {% endif %}
 
+   {% if comparison_data %}
+    <h2 style="text-align: center;">Peer Comparison</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Ticker</th>
+                <th>Market Cap</th>
+                <th>P/E Ratio</th>
+                <th>ROE (%)</th>
+                <th>EPS</th>
+                <th>Debt/Equity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stock in comparison_data %}
+            <tr>
+                <td>{{ stock.ticker }}</td>
+                <td>{{ stock.market_cap }}</td>
+                <td>{{ stock.pe_ratio }}</td>
+                <td>{{ stock.roe }}</td>
+                <td>{{ stock.eps }}</td>
+                <td>{{ stock.de_ratio }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
     <canvas id="stockChart" width="800" height="400"></canvas>
 
-    <script>
-        function handleTickerChange(selectElement) {
-            const dropdown = document.getElementById('tickerDropdown');
-            const ctx = document.getElementById('stockChart').getContext('2d');
-            let chart;
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dropdown = document.getElementById('tickerDropdown');
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        let chart;
 
-            const ticker = dropdown.value;
-            if (!ticker) return;
+        function getSelectedTickers() {
+            return Array.from(dropdown.selectedOptions).map(opt => opt.value);
+        }
 
-            fetch(`/get_stock_data/?ticker=${ticker}`)
+        function handleTickerChange() {
+            const tickers = getSelectedTickers();
+            if (!tickers.length) return;
+
+            const query = tickers.map(t => `ticker=${t}`).join('&');
+
+            fetch(`/get_stock_data/?${query}`)
                 .then(res => res.json())
                 .then(data => {
                     if (chart) chart.destroy();
+
+                    const datasets = [];  // ✅ Reset fresh for each render
+let labels = [];
+
+tickers.forEach((ticker, i) => {
+    const stockData = data.stocks[ticker];
+    if (!stockData || stockData.error) return;
+
+    // ✅ Only set labels from the first ticker
+    if (i === 0) {
+        labels = stockData.dates;
+    }
+
+    
+    const anomalyPointStyles = stockData.anomalies.map(flag => flag ? 'circle' : false);
+    const anomalyPointColors = stockData.anomalies.map(flag => flag ? 'red' : 'transparent');
+    const pointRadii = stockData.anomalies.map(flag => flag ? 5 : 0);
+
+    datasets.push({
+        label: `${ticker} Close`,
+        data: stockData.closing_prices,
+        borderColor: getRandomColor(),
+        fill: false,
+        tension: 0.3,
+        pointStyle: anomalyPointStyles,
+        pointBackgroundColor: anomalyPointColors,
+        pointRadius: pointRadii,
+        pointHoverRadius: pointRadii
+    });
+
+    // ✅ Add volume dataset
+    datasets.push({
+        label: `${ticker} Volume`,
+        data: stockData.volumes,
+        borderColor: getRandomColor(),
+        yAxisID: 'y1',
+        borderDash: [5, 5],
+        fill: false,
+        tension: 0.3
+    });
+});
+
+
                     chart = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: data.dates,
-                            datasets: [{
-                                label: `${ticker} Closing Prices`,
-                                data: data.closing_prices,
-                                borderColor: 'blue',
-                                fill: false,
-                                tension: 0.3
-                            }]
+                            labels: labels,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Peer Comparison - Close & Volume'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    position: 'left',
+                                    title: {
+                                        display: true,
+                                        text: 'Close Price'
+                                    }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Volume'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false
+                                    }
+                                }
+                            }
                         }
                     });
                 });
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const dropdown = document.getElementById('tickerDropdown');
-            const formWasSubmitted = {{ form_submitted|yesno:"true,false" }};
-            if (formWasSubmitted && dropdown) {
-                handleTickerChange(dropdown);
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
             }
-        });
-    </script>
+            return color;
+        }
+
+        const formWasSubmitted = {{ form_submitted|yesno:"true,false" }};
+        if (formWasSubmitted) {
+            handleTickerChange();
+        }
+    });
+</script>
+
 </body>
 </html>
