@@ -172,9 +172,9 @@ tickers.forEach((ticker, i) => {
     }
 
     
-    const anomalyPointStyles = stockData.anomalies.map(flag => flag ? 'circle' : false);
-    const anomalyPointColors = stockData.anomalies.map(flag => flag ? 'red' : 'transparent');
-    const pointRadii = stockData.anomalies.map(flag => flag ? 5 : 0);
+    const anomalyPointStyles = stockData.anomalies_close.map(flag => flag ? 'circle' : false);
+    const anomalyPointColors = stockData.anomalies_close.map(flag => flag ? 'red' : 'transparent');
+    const pointRadii = stockData.anomalies_close.map(flag => flag ? 5 : 0);
 
     datasets.push({
         label: `${ticker} Close`,
@@ -196,7 +196,9 @@ tickers.forEach((ticker, i) => {
         yAxisID: 'y1',
         borderDash: [5, 5],
         fill: false,
-        tension: 0.3
+        tension: 0.3,
+        pointRadius: stockData.anomalies_volume.map(z => Math.abs(z) >= 1 ? 5 : 0),    
+        pointBackgroundColor: stockData.anomalies_volume.map(z => Math.abs(z) >= 1 ? 'orange' : 'transparent')
     });
 });
 

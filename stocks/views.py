@@ -20,19 +20,26 @@ def get_stock_data(request):
             if isinstance(data.columns, pd.MultiIndex):
                 close_prices = data[('Close', ticker)]
                 volumes = data[('Volume', ticker)]
-                anomalies=((zscore(data[('Close', ticker)]) >= 2) | (zscore(data[('Close', ticker)]) <= -2)).tolist()
+                #anomalies=((zscore(data[('Close', ticker)]) >= 2) | (zscore(data[('Close', ticker)]) <= -2)).tolist()
 
             else:
                 close_prices = data['Close']
                 volumes = data['Volume']
-                anomalies=((zscore(data['Close']) >= 2)| (zscore(data['Close']) <=-2)).tolist()
+                #anomalies=((zscore(data['Close']) >= 2)| (zscore(data['Close']) <=-2)).tolist()
 
+            # Calculate Z-scores
+            z_close = zscore(close_prices.fillna(0))
+            z_volume = zscore(volumes.fillna(0))
 
+            # Detect anomalies where z-score >= 2 or <= -2
+            anomalies_close = ((z_close >= 2) | (z_close <= -2)).tolist()
+            anomalies_volume = ((z_volume >= 2) | (z_volume <= -2)).tolist()
             result["stocks"][ticker] = {
                 'dates': data['Date'].dt.strftime('%Y-%m-%d').tolist(),
                 'closing_prices': close_prices.round(2).tolist(),
                 'volumes': volumes.tolist(),
-                'anomalies':anomalies
+                'anomalies_close':anomalies_close,
+                'anomalies_volume':anomalies_volume,
             }
         except Exception as e:
             result["stocks"][ticker] = {"error": str(e)}
