@@ -65,6 +65,12 @@
             padding: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+        body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
     </style>
 </head>
 <body>
@@ -135,8 +141,9 @@
         </tbody>
     </table>
 {% endif %}
-
+<div id="chart-container" style="position: relative; width: 100vw; height: 100vh;">
     <canvas id="stockChart" width="800" height="400"></canvas>
+</div>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -188,6 +195,63 @@ tickers.forEach((ticker, i) => {
         pointHoverRadius: pointRadii
     });
 
+ // ✅ Add SMA 20 dataset
+datasets.push({
+    label: `${ticker} SMA 20`,
+    data: stockData.sma_20,
+    borderColor: 'blue',
+    borderDash: [5, 5],
+    fill: false,
+    tension: 0.3,
+    yAxisID: 'y'
+});
+
+// ✅ Add SMA 50 dataset
+datasets.push({
+    label: `${ticker} SMA 50`,
+    data: stockData.sma_50,
+    borderColor: 'green',
+    borderDash: [8, 4],
+    fill: false,
+    tension: 0.3,
+    yAxisID: 'y'
+});
+
+// Golden Cross Markers
+stockData.golden_crosses.forEach(index => {
+    datasets.push({
+        label: `${ticker} Golden Cross`,
+        data: [stockData.closing_prices[index]],
+        backgroundColor: 'green',
+        borderColor: 'green',
+        pointRadius: 6,
+        pointStyle: 'triangle',
+        fill: false,
+        type: 'line',
+        spanGaps: true,
+        pointHoverRadius: 6,
+        showLine: false,
+        data: stockData.closing_prices.map((_, i) => i === index ? stockData.closing_prices[i] : null)
+    });
+});
+
+// Death Cross Markers
+stockData.death_crosses.forEach(index => {
+    datasets.push({
+        label: `${ticker} Death Cross`,
+        data: [stockData.closing_prices[index]],
+        backgroundColor: 'red',
+        borderColor: 'red',
+        pointRadius: 6,
+        pointStyle: 'rect',
+        fill: false,
+        type: 'line',
+        spanGaps: true,
+        pointHoverRadius: 6,
+        showLine: false,
+        data: stockData.closing_prices.map((_, i) => i === index ? stockData.closing_prices[i] : null)
+    });
+});
     // ✅ Add volume dataset
     datasets.push({
         label: `${ticker} Volume`,
@@ -210,8 +274,9 @@ tickers.forEach((ticker, i) => {
                             datasets: datasets
                         },
                         options: {
-                            responsive: true,
-                            plugins: {
+                               responsive: true,
+                               maintainAspectRatio: false,                            
+        plugins: {
                                 title: {
                                     display: true,
                                     text: 'Peer Comparison - Close & Volume'
