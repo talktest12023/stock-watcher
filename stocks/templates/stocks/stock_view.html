@@ -142,7 +142,8 @@
     </table>
 {% endif %}
 <div id="chart-container" style="position: relative; width: 100vw; height: 100vh;">
-    <canvas id="stockChart" width="800" height="400"></canvas>
+    <canvas id="stockChart" style="width: 100%; height: 300px;"></canvas>
+    <canvas id="macdChart" style="width: 100%; height: 300px;"></canvas>
 </div>
 
   <script>
@@ -305,6 +306,87 @@ stockData.death_crosses.forEach(index => {
                             }
                         }
                     });
+
+// =================== MACD Chart (SECOND chart) ===================
+const macdCtx = document.getElementById('macdChart').getContext('2d');
+const ticker = tickers[0];  // Only show MACD for first ticker
+const stockData = data.stocks[ticker];
+
+const macdChart = new Chart(macdCtx, {
+    type: 'bar',
+    data: {
+        labels: stockData.dates,
+        datasets: [
+            {
+                type: 'line',
+                label: 'MACD Line '+ticker,
+                data: stockData.macd_line,
+                borderColor: 'blue',
+                borderWidth: 2,
+                fill: false,
+                yAxisID: 'y1'
+            },
+            {
+                type: 'line',
+                label: 'Signal Line '+ticker,
+                data: stockData.signal_line,
+                borderColor: 'orange',
+                borderWidth: 2,
+                fill: false,
+                yAxisID: 'y1'
+            },
+            {
+                type: 'bar',
+                label: 'MACD Histogram '+ticker,
+                data: stockData.macd_histogram,
+                backgroundColor: function(context) {
+                    const value = context.raw;
+                    return value >= 0 ? 'green' : 'red';
+                },
+                yAxisID: 'y2'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            title: {
+                display: true,
+                text: 'MACD Indicator'
+            }
+        },
+        scales: {
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'MACD / Signal'
+                }
+            },
+            y2: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                grid: {
+                    drawOnChartArea: false
+                },
+                title: {
+                    display: true,
+                    text: 'Histogram'
+                }
+            }
+        }
+    }
+});
+
+
+
                 });
         }
 

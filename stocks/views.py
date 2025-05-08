@@ -46,6 +46,12 @@ def get_stock_data(request):
 
             sma_20 = sma_20_series.fillna(method='bfill').fillna(0).round(2).tolist()
             sma_50 = sma_50_series.fillna(method='bfill').fillna(0).round(2).tolist()
+            # MACD calculations
+            ema_12 = close_prices.ewm(span=12, adjust=False).mean()
+            ema_26 = close_prices.ewm(span=26, adjust=False).mean()
+            macd_line = ema_12 - ema_26
+            signal_line = macd_line.ewm(span=9, adjust=False).mean()
+            macd_hist = macd_line - signal_line
 
             # Golden / Death Crosses
             golden_crosses = []
@@ -71,6 +77,9 @@ def get_stock_data(request):
                 'sma_50': sma_50,
                 'golden_crosses': golden_crosses,
                 'death_crosses': death_crosses,
+                'macd_line': macd_line.round(2).fillna(0).tolist(),
+                'signal_line': signal_line.round(2).fillna(0).tolist(),
+                'macd_histogram': macd_hist.round(2).fillna(0).tolist(),
             }
         except Exception as e:
             result["stocks"][ticker] = {"error": str(e)}
