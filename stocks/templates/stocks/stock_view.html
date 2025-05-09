@@ -144,6 +144,7 @@
 <div id="chart-container" style="position: relative; width: 100vw; height: 100vh;">
     <canvas id="stockChart" style="width: 100%; height: 300px;"></canvas>
     <canvas id="macdChart" style="width: 100%; height: 300px;"></canvas>
+    <canvas id="rsiChart" style="width: 100%; height: 200px;"></canvas>
 </div>
 
   <script>
@@ -379,6 +380,63 @@ const macdChart = new Chart(macdCtx, {
                 title: {
                     display: true,
                     text: 'Histogram'
+                }
+            }
+        }
+    }
+});
+
+// =================== RSI Chart (THIRD chart) ===================
+const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+
+const rsiData = stockData.RSI;
+
+const rsiChart = new Chart(rsiCtx, {
+    type: 'line',
+    data: {
+        labels: stockData.dates,
+        datasets: [
+            {
+                label: 'RSI (Relative Strength Index)',
+                data: rsiData,
+                borderColor: '#8e44ad',
+                tension: 0.3,
+                pointRadius: 0,
+                fill: false
+            },
+            {
+                label: 'Overbought (70)',
+                data: Array(stockData.dates.length).fill(70),
+                borderColor: 'red',
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false
+            },
+            {
+                label: 'Oversold (30)',
+                data: Array(stockData.dates.length).fill(30),
+                borderColor: 'green',
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            title: {
+                display: true,
+                text: 'RSI (Relative Strength Index) '+ticker
+            }
+        },
+        scales: {
+            y: {
+                min: 0,
+                max: 100,
+                title: {
+                    display: true,
+                    text: 'RSI Value '+ticker
                 }
             }
         }

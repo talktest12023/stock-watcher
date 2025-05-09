@@ -6,6 +6,7 @@ from .models import Stock
 import pandas as pd
 from scipy.stats import zscore
 from django.core.cache import cache
+import numpy as np
 
 
 def get_stock_data(request):
@@ -56,6 +57,16 @@ def get_stock_data(request):
             # Golden / Death Crosses
             golden_crosses = []
             death_crosses = []
+            # ✅ Calculate RSI
+            delta = data['Close'].diff()
+            gain = delta.clip(lower=0)
+            loss = -delta.clip(upper=0)
+            avg_gain = gain.rolling(window=14).mean()
+            avg_loss = loss.rolling(window=14).mean()
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
+            data['RSI'] = rsi
+            print(data['RSI'])
 
             for i in range(1, len(close_prices)):
                 if pd.notna(sma_20_series[i]) and pd.notna(sma_50_series[i]) and pd.notna(sma_20_series[i - 1]) and pd.notna(sma_50_series[i - 1]):
@@ -80,6 +91,7 @@ def get_stock_data(request):
                 'macd_line': macd_line.round(2).fillna(0).tolist(),
                 'signal_line': signal_line.round(2).fillna(0).tolist(),
                 'macd_histogram': macd_hist.round(2).fillna(0).tolist(),
+                'RSI': data['RSI'].round(2).fillna(0).tolist(),
             }
         except Exception as e:
             result["stocks"][ticker] = {"error": str(e)}
