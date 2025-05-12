@@ -18,7 +18,6 @@ def get_stock_data(request):
 
     for ticker in tickers:
         try:
-            # ✅ Check cache first
             cache_key = f"{ticker}_6mo_data"
             data = cache.get(cache_key)
 
@@ -28,58 +27,71 @@ def get_stock_data(request):
 
             data.reset_index(inplace=True)
 
+            # ✅ Handle both MultiIndex and flat DataFrame
             if isinstance(data.columns, pd.MultiIndex):
+                open_prices = data[('Open', ticker)]
+                high_prices = data[('High', ticker)]
+                low_prices = data[('Low', ticker)]
                 close_prices = data[('Close', ticker)]
                 volumes = data[('Volume', ticker)]
             else:
+                open_prices = data['Open']
+                high_prices = data['High']
+                low_prices = data['Low']
                 close_prices = data['Close']
                 volumes = data['Volume']
 
+            # Z-score anomalies
             z_close = zscore(close_prices.fillna(0))
             z_volume = zscore(volumes.fillna(0))
-
             anomalies_close = ((z_close >= 2) | (z_close <= -2)).tolist()
             anomalies_volume = ((z_volume >= 2) | (z_volume <= -2)).tolist()
 
-            # SMAs
+            # SMA
             sma_20_series = close_prices.rolling(window=20).mean().fillna(0)
             sma_50_series = close_prices.rolling(window=50).mean().fillna(0)
+            sma_20 = sma_20_series.round(2).tolist()
+            sma_50 = sma_50_series.round(2).tolist()
 
-            sma_20 = sma_20_series.fillna(method='bfill').fillna(0).round(2).tolist()
-            sma_50 = sma_50_series.fillna(method='bfill').fillna(0).round(2).tolist()
-            # MACD calculations
+            # MACD
             ema_12 = close_prices.ewm(span=12, adjust=False).mean()
             ema_26 = close_prices.ewm(span=26, adjust=False).mean()
             macd_line = ema_12 - ema_26
             signal_line = macd_line.ewm(span=9, adjust=False).mean()
             macd_hist = macd_line - signal_line
 
-            # Golden / Death Crosses
-            golden_crosses = []
-            death_crosses = []
-            # ✅ Calculate RSI
-            delta = data['Close'].diff()
+            # RSI
+            delta = close_prices.diff()
             gain = delta.clip(lower=0)
             loss = -delta.clip(upper=0)
             avg_gain = gain.rolling(window=14).mean()
             avg_loss = loss.rolling(window=14).mean()
             rs = avg_gain / avg_loss
             rsi = 100 - (100 / (1 + rs))
-            data['RSI'] = rsi
-            print(data['RSI'])
+            rsi = rsi.round(2).fillna(0)
 
+            # Golden/Death Crosses
+            golden_crosses = []
+            death_crosses = []
             for i in range(1, len(close_prices)):
                 if pd.notna(sma_20_series[i]) and pd.notna(sma_50_series[i]) and pd.notna(sma_20_series[i - 1]) and pd.notna(sma_50_series[i - 1]):
                     prev_diff = sma_20_series[i - 1] - sma_50_series[i - 1]
                     curr_diff = sma_20_series[i] - sma_50_series[i]
-
                     if prev_diff < 0 and curr_diff >= 0:
                         golden_crosses.append(i)
                     elif prev_diff > 0 and curr_diff <= 0:
                         death_crosses.append(i)
 
+            # ✅ Clean OHLC array for candlestick chart
+            dates = data['Date'].dt.strftime('%Y-%m-%d')
+            ohlc = [
+                {"x": date, "o": float(o), "h": float(h), "l": float(l), "c": float(c)}
+                for date, o, h, l, c in zip(dates, open_prices, high_prices, low_prices, close_prices)
+            ]
+
+            # Final JSON for this stock
             result["stocks"][ticker] = {
-                'dates': data['Date'].dt.strftime('%Y-%m-%d').tolist(),
+                'dates': dates.tolist(),
                 'closing_prices': close_prices.round(2).tolist(),
                 'volumes': volumes.tolist(),
                 'anomalies_close': anomalies_close,
@@ -91,12 +103,15 @@ def get_stock_data(request):
                 'macd_line': macd_line.round(2).fillna(0).tolist(),
                 'signal_line': signal_line.round(2).fillna(0).tolist(),
                 'macd_histogram': macd_hist.round(2).fillna(0).tolist(),
-                'RSI': data['RSI'].round(2).fillna(0).tolist(),
+                'RSI': rsi.tolist(),
+                'ohlc': ohlc,
             }
+
         except Exception as e:
             result["stocks"][ticker] = {"error": str(e)}
 
     return JsonResponse(result)
+
 
 
 def stock_view(request):

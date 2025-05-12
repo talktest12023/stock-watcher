@@ -2,7 +2,10 @@
 <html>
 <head>
     <title>Stock Watchlist</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -83,6 +86,8 @@
         <option value="{{ stock.ticker }}" {% if stock.ticker in selected_ticker %}selected{% endif %}>{{ stock.ticker }}</option>
     {% endfor %}
 </select>
+     <label>Set Price Alert (per ticker):</label>
+     <div id="priceAlertInputs"></div>
         <button name="fetch_data" type="submit" value="1">Get Data</button>
         {% if data %}
         <button type="submit" name="export_csv">Export as CSV</button>
@@ -145,6 +150,7 @@
     <canvas id="stockChart" style="width: 100%; height: 300px;"></canvas>
     <canvas id="macdChart" style="width: 100%; height: 300px;"></canvas>
     <canvas id="rsiChart" style="width: 100%; height: 200px;"></canvas>
+    <canvas id="candlestickChart" style="width: 100%; height: 400px;"></canvas>
 </div>
 
   <script>
@@ -445,6 +451,68 @@ const rsiChart = new Chart(rsiCtx, {
 
 
 
+  const canvas = document.getElementById('candlestickChart');
+  const canctx = canvas.getContext('2d');      
+  const datacandle=[];
+
+      for (let i = 0; i < stockData.ohlc.length; i++) {
+      datacandle.push({ x: new Date(stockData.ohlc[i].x), o: stockData.ohlc[i].o, h: stockData.ohlc[i].h, l: stockData.ohlc[i].l, c: stockData.ohlc[i].c });  // pushing 0, 10, 20, 30, 40
+}
+    /*const datacandle = [
+      { x: new Date('2025-05-01'), o: 100, h: 110, l: 90, c: 105 },
+      { x: new Date('2025-05-02'), o: 105, h: 115, l: 95, c: 100 },
+      { x: new Date('2025-05-03'), o: 100, h: 108, l: 98, c: 107 },
+      { x: new Date('2025-05-04'), o: 107, h: 120, l: 106, c: 115 },
+      { x: new Date('2025-05-05'), o: 115, h: 118, l: 110, c: 112 }
+    ];*/
+ const calculateBarThickness = (canvasWidth, dataLength, factor = 1.5, minWidth = 2, maxWidth = 15) => {
+    const estimated = canvasWidth / (dataLength * factor);
+    return Math.max(minWidth, Math.min(estimated, maxWidth));
+  };
+
+  const barThickness = calculateBarThickness(canvas.width, datacandle.length);
+
+  const chartcandle = new Chart(canctx, {
+    type: 'candlestick',
+    data: {
+      datasets: [{
+        label: 'Candle Stick for '+ticker,
+        data: datacandle,
+        color: {
+          up: '#26a69a',
+          down: '#ef5350',
+          unchanged: '#999'
+        },
+        barThickness: barThickness
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false,
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'day' },
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 15
+          }
+        },
+        y: {
+          beginAtZero: false
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top'
+        }
+      }
+    }
+  });
+
+
+
                 });
         }
 
@@ -461,6 +529,28 @@ const rsiChart = new Chart(rsiCtx, {
         if (formWasSubmitted) {
             handleTickerChange();
         }
+
+        // Dynamically generate alert input boxes when tickers are selected
+function renderPriceAlertInputs(tickers) {
+    const container = document.getElementById('priceAlertInputs');
+    container.innerHTML = '';
+    tickers.forEach(ticker => {
+        const label = document.createElement('label');
+        label.textContent = `${ticker} Alert Price:`;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.name = `alert_${ticker}`;
+        input.placeholder = 'e.g., 1234';
+        input.step = '0.01';
+        container.appendChild(label);
+        container.appendChild(input);
+    });
+}
+
+// Re-render alert inputs on dropdown change
+dropdown.addEventListener('change', () => {
+    renderPriceAlertInputs(getSelectedTickers());
+});
     });
 </script>
 
