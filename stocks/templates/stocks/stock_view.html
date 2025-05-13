@@ -472,11 +472,27 @@ const rsiChart = new Chart(rsiCtx, {
 
   const barThickness = calculateBarThickness(canvas.width, datacandle.length);
 
-  const chartcandle = new Chart(canctx, {
-    type: 'candlestick',
-    data: {
-      datasets: [{
-        label: 'Candle Stick for '+ticker,
+  const dataWithZ = calculateZScores(datacandle, 'c');
+
+    // 3️⃣ Extract Price Anomalies
+    const zThreshold = 2;
+    const priceAnomalies = dataWithZ
+      .filter(d => Math.abs(d.cZ) > zThreshold)
+      .map(d => ({
+        x: d.x,
+        y: d.c,
+        r: 5,
+        backgroundColor: 'red',
+        zScore: d.cZ.toFixed(2),
+      date: d.x.toISOString().split('T')[0]
+      }));
+
+ const chartcandle = new Chart(canctx, {
+  type: 'candlestick',
+  data: {
+    datasets: [
+      {
+        label: 'Candle Stick for ' + ticker,
         data: datacandle,
         color: {
           up: '#26a69a',
@@ -484,32 +500,65 @@ const rsiChart = new Chart(rsiCtx, {
           unchanged: '#999'
         },
         barThickness: barThickness
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      parsing: false,
-      scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'day' },
-          ticks: {
-            autoSkip: true,
-            maxTicksLimit: 15
-          }
-        },
-        y: {
-          beginAtZero: false
+      },
+      {
+        type: 'bubble',
+        label: 'Price Anomalies',
+        data: priceAnomalies,
+        parsing: false,
+        showLine: false,
+        backgroundColor: 'red'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    parsing: false,
+    scales: {
+      x: {
+        type: 'time',
+        time: { unit: 'day' },
+        ticks: {
+          autoSkip: true,
+          maxTicksLimit: 15
         }
       },
-      plugins: {
-        legend: {
-          position: 'top'
+      y: {
+        beginAtZero: false
+      }
+    },
+  plugins: {
+  legend: {
+    position: 'top'
+  },
+  tooltip: {
+    callbacks: {
+      label: function (context) {
+        if (context.dataset.type === 'bubble') {
+          const d = context.raw;
+          return [
+            '🚨 *Price Anomaly*',
+            `📅 Date: ${d.date}`,
+            `💰 Close: ₹${d.y}`,
+            `📊 Z-score: ${d.zScore}`
+          ];
+        } else {
+          const candle = context.raw;
+          return [
+            `🟢 Open: ₹${candle.o}`,
+            `📈 High: ₹${candle.h}`,
+            `📉 Low: ₹${candle.l}`,
+            `🔴 Close: ₹${candle.c}`
+          ];
         }
       }
     }
-  });
+  }
+}
+
+  }
+});
 
 
 
@@ -546,6 +595,17 @@ function renderPriceAlertInputs(tickers) {
         container.appendChild(input);
     });
 }
+
+// 2️⃣ Z-Score Calculation on Closing Price
+    function calculateZScores(data, key) {
+      const values = data.map(item => item[key]);
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const std = Math.sqrt(values.reduce((sum, val) => sum + (val - mean) ** 2, 0) / values.length);
+      return data.map(item => ({
+        ...item,
+        [`${key}Z`]: std === 0 ? 0 : (item[key] - mean) / std
+      }));
+    }
 
 // Re-render alert inputs on dropdown change
 dropdown.addEventListener('change', () => {
