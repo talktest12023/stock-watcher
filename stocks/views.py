@@ -7,10 +7,13 @@ import pandas as pd
 from scipy.stats import zscore
 from django.core.cache import cache
 import numpy as np
+from datetime import date, timedelta
 
 
 def get_stock_data(request):
     tickers = request.GET.getlist('ticker')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
     if not tickers:
         return JsonResponse({'error': 'No tickers provided'}, status=400)
 
@@ -22,7 +25,10 @@ def get_stock_data(request):
             data = cache.get(cache_key)
 
             if data is None:
-                data = yf.download(ticker, period='6mo', interval='1d', progress=False)
+                if start_date and end_date:
+                    data = yf.download(ticker, start=start_date, end=end_date, interval='1d', progress=False)
+                else:
+                    data = yf.download(ticker, period='6mo', interval='1d', progress=False)
                 cache.set(cache_key, data, timeout=3600)
 
             data.reset_index(inplace=True)
@@ -113,18 +119,57 @@ def get_stock_data(request):
     return JsonResponse(result)
 
 
+def fetch_stock_dataframe(ticker, start_date=None, end_date=None):
+    try:
+        if start_date and end_date:
+            df = yf.download(ticker, start=start_date, end=end_date, interval='1d', progress=False)
+        else:
+            df = yf.download(ticker, period='6mo', interval='1d', progress=False)
+        return df
+    except Exception as e:
+        print(f"Error fetching {ticker}: {e}")
+        return None
+
 
 def stock_view(request):
     data = []
     selected_tickers = []
     form_submitted = False
     comparison_data = []
+    price_alerts = []  # ✅ initialize here to fix the error
 
     if request.method == "POST":
         selected_tickers = request.POST.getlist("ticker[]")
         form_submitted = 'fetch_data' in request.POST
-
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+        upper_limit = request.POST.get('upper_limit')
+        lower_limit = request.POST.get('lower_limit')
+        if upper_limit:
+            upper_limit = float(upper_limit)
+        if lower_limit:
+            lower_limit = float(lower_limit)
+        #price_alerts = []
         for ticker in selected_tickers:
+            df = fetch_stock_dataframe(ticker, start_date, end_date)
+            if df is not None and not df.empty:
+                latest_price = df['Close'].iloc[-1]
+                alert_type = None
+                if upper_limit and latest_price >= upper_limit:
+                    alert_type = '🔺 Price above upper limit'
+                elif lower_limit and latest_price <= lower_limit:
+                    alert_type = '🔻 Price below lower limit'
+
+                if alert_type:
+                    price_alerts.append({
+                    'ticker': ticker,
+                    'latest_price': latest_price,
+                    'alert': alert_type,
+                    })
+
+            print("price alert print",price_alerts)
+            # Optional: Pass to template or use for alerting logic
+            #context['price_alerts'] = price_alerts
             stock = yf.Ticker(ticker)
 
             # ✅ Cache history
@@ -181,6 +226,9 @@ def stock_view(request):
         "selected_ticker": selected_tickers,
         'form_submitted': form_submitted,
         "comparison_data": comparison_data,
+        "today": date.today().isoformat(),
+        "today_minus_30": (date.today() - timedelta(days=30)).isoformat(),
+        "price_alerts": price_alerts,  # ✅ add it here
     }
     return render(request, "stocks/stock_view.html", context)
 

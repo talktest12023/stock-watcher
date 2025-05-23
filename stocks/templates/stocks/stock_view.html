@@ -86,6 +86,18 @@
         <option value="{{ stock.ticker }}" {% if stock.ticker in selected_ticker %}selected{% endif %}>{{ stock.ticker }}</option>
     {% endfor %}
 </select>
+
+  <!-- New Date Range Inputs -->
+  <label for="start_date">Start Date:</label>
+<input type="date" name="start_date" id="start_date" value="{{ request.GET.start_date|default:today_minus_30 }}">
+  <label for="end_date">End Date:</label>
+<input type="date" name="end_date" id="end_date" value="{{ request.GET.end_date|default:today }}">
+  <!-- Upper/Lower Limit Inputs -->
+  <label for="upper_limit">Upper Price Limit:</label>
+  <input type="number" step="0.01" name="upper_limit">
+
+  <label for="lower_limit">Lower Price Limit:</label>
+  <input type="number" step="0.01" name="lower_limit">
      <label>Set Price Alert (per ticker):</label>
      <div id="priceAlertInputs"></div>
         <button name="fetch_data" type="submit" value="1">Get Data</button>
@@ -151,13 +163,12 @@
     <canvas id="macdChart" style="width: 100%; height: 300px;"></canvas>
     <canvas id="rsiChart" style="width: 100%; height: 200px;"></canvas>
     <canvas id="candlestickChart" style="width: 100%; height: 400px;"></canvas>
- <button id="downloadAnomaliesBtn">⬇️ Download Price Anomalies CSV</button>
-
 </div>
 
   <script>
-
     document.addEventListener('DOMContentLoaded', () => {
+
+
         const dropdown = document.getElementById('tickerDropdown');
         const ctx = document.getElementById('stockChart').getContext('2d');
         let chart;
@@ -171,9 +182,11 @@
             if (!tickers.length) return;
 
             const query = tickers.map(t => `ticker=${t}`).join('&');
-
-            fetch(`/get_stock_data/?${query}`)
-                .then(res => res.json())
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            //fetch(`/get_stock_data/?${query}`)
+            fetch(`/get_stock_data?${query}&start_date=${startDate}&end_date=${endDate}`)                
+            .then(res => res.json())
                 .then(data => {
                     if (chart) chart.destroy();
 
@@ -475,27 +488,11 @@ const rsiChart = new Chart(rsiCtx, {
 
   const barThickness = calculateBarThickness(canvas.width, datacandle.length);
 
-  const dataWithZ = calculateZScores(datacandle, 'c');
-
-    // 3️⃣ Extract Price Anomalies
-    const zThreshold = 2;
-    const priceAnomalies = dataWithZ
-      .filter(d => Math.abs(d.cZ) > zThreshold)
-      .map(d => ({
-        x: d.x,
-        y: d.c,
-        r: 5,
-        backgroundColor: 'red',
-        zScore: d.cZ.toFixed(2),
-      date: d.x.toISOString().split('T')[0]
-      }));
-
- const chartcandle = new Chart(canctx, {
-  type: 'candlestick',
-  data: {
-    datasets: [
-      {
-        label: 'Candle Stick for ' + ticker,
+  const chartcandle = new Chart(canctx, {
+    type: 'candlestick',
+    data: {
+      datasets: [{
+        label: 'Candle Stick for '+ticker,
         data: datacandle,
         color: {
           up: '#26a69a',
@@ -503,90 +500,33 @@ const rsiChart = new Chart(rsiCtx, {
           unchanged: '#999'
         },
         barThickness: barThickness
-      },
-      {
-        type: 'bubble',
-        label: 'Price Anomalies',
-        data: priceAnomalies,
-        parsing: false,
-        showLine: false,
-        backgroundColor: 'red'
-      }
-    ]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    parsing: false,
-    scales: {
-      x: {
-        type: 'time',
-        time: { unit: 'day' },
-        ticks: {
-          autoSkip: true,
-          maxTicksLimit: 15
-        }
-      },
-      y: {
-        beginAtZero: false
-      }
+      }]
     },
-  plugins: {
-  legend: {
-    position: 'top'
-  },
-  tooltip: {
-    callbacks: {
-      label: function (context) {
-        if (context.dataset.type === 'bubble') {
-          const d = context.raw;
-          return [
-            '🚨 *Price Anomaly*',
-            `📅 Date: ${d.date}`,
-            `💰 Close: ₹${d.y}`,
-            `📊 Z-score: ${d.zScore}`
-          ];
-        } else {
-          const candle = context.raw;
-          return [
-            `🟢 Open: ₹${candle.o}`,
-            `📈 High: ₹${candle.h}`,
-            `📉 Low: ₹${candle.l}`,
-            `🔴 Close: ₹${candle.c}`
-          ];
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false,
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'day' },
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 15
+          }
+        },
+        y: {
+          beginAtZero: false
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top'
         }
       }
     }
-  }
-}
+  });
 
-  }
-});
-
-// 4️⃣ Export Price Anomalies to CSV
-document.getElementById('downloadAnomaliesBtn').addEventListener('click', () => {
-    if (!priceAnomalies || priceAnomalies.length === 0) {
-        alert("No anomalies to export.");
-        return;
-    }
-
-    const header = ["Date", "Close Price", "Z-score"];
-    const rows = priceAnomalies.map(d => [d.date, d.y, d.zScore]);
-
-    const csvContent = [header, ...rows]
-        .map(e => e.join(","))
-        .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `price_anomalies_${ticker}.csv`);
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-});
 
 
                 });
@@ -607,47 +547,64 @@ document.getElementById('downloadAnomaliesBtn').addEventListener('click', () => 
         }
 
         // Dynamically generate alert input boxes when tickers are selected
-function renderPriceAlertInputs(tickers) {
-    const container = document.getElementById('priceAlertInputs');
-    container.innerHTML = '';
-    tickers.forEach(ticker => {
-        const label = document.createElement('label');
-        label.textContent = `${ticker} Alert Price:`;
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.name = `alert_${ticker}`;
-        input.placeholder = 'e.g., 1234';
-        input.step = '0.01';
-        container.appendChild(label);
-        container.appendChild(input);
+// Dynamically generate alert input boxes when tickers are selected
+    function renderPriceAlertInputs(tickers) 
+    {
+        const alertDiv = document.getElementById('priceAlertInputs');
+        alertDiv.innerHTML = '';  // Clear previous
+
+        tickers.forEach(ticker => {
+            const container = document.createElement('div');
+            container.style.marginBottom = '15px';
+            container.innerHTML = `
+                <label style="font-weight: bold;">${ticker} - Price Alerts:</label>
+                <input type="number" step="0.01" name="price_alert_upper_${ticker}" placeholder="Upper Price Alert for ${ticker}" style="margin-bottom: 5px; width: 100%; padding: 6px;" />
+                <input type="number" step="0.01" name="price_alert_lower_${ticker}" placeholder="Lower Price Alert for ${ticker}" style="margin-bottom: 5px; width: 100%; padding: 6px;" />
+            `;
+            alertDiv.appendChild(container);
+        });
+    }
+  
+    // Generate price alert input fields for selected tickers
+function updatePriceAlertInputs() {
+    const alertContainer = document.getElementById('priceAlertInputs');
+    alertContainer.innerHTML = '';  // Clear previous
+
+    const selected = Array.from(dropdown.selectedOptions).map(opt => opt.value);
+    selected.forEach(ticker => {
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <label>${ticker} Alerts:</label>
+            <input type="number" name="price_alert_min_${ticker}" step="0.01" placeholder="Min Price for ${ticker}">
+            <input type="number" name="price_alert_max_${ticker}" step="0.01" placeholder="Max Price for ${ticker}">
+        `;
+        alertContainer.appendChild(div);
     });
 }
 
+// Trigger update when selection changes
+dropdown.addEventListener('change', updatePriceAlertInputs);
 
+// Call it initially if form already submitted
+if (formWasSubmitted) {
+    updatePriceAlertInputs();
+}
 
-// 2️⃣ Z-Score Calculation on Closing Price
-    function calculateZScores(data, key) {
-      const values = data.map(item => item[key]);
-      const mean = values.reduce((a, b) => a + b, 0) / values.length;
-      const std = Math.sqrt(values.reduce((sum, val) => sum + (val - mean) ** 2, 0) / values.length);
-      return data.map(item => ({
-        ...item,
-        [`${key}Z`]: std === 0 ? 0 : (item[key] - mean) / std
-      }));
-    }
+    // Event Listener: Update alerts inputs when ticker selection changes
+    document.getElementById('tickerDropdown').addEventListener('change', function () {
+        const selected = Array.from(this.selectedOptions).map(opt => opt.value);
+        renderPriceAlertInputs(selected);
+    });
 
-
+    // Restore inputs on page load if form was submitted
+    const selectedTickers = Array.from(document.getElementById('tickerDropdown').selectedOptions).map(opt => opt.value);
+    renderPriceAlertInputs(selectedTickers);
 
 // Re-render alert inputs on dropdown change
 dropdown.addEventListener('change', () => {
     renderPriceAlertInputs(getSelectedTickers());
 });
     });
-
-
-
-
-
 </script>
 
 </body>
